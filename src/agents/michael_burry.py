@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 import json
+from typing import Dict, List
 from typing_extensions import Literal
 
 from src.graph.state import AgentState, show_agent_reasoning
@@ -34,13 +35,13 @@ def michael_burry_agent(state: AgentState, agent_id: str = "michael_burry_agent"
     api_key = get_api_key_from_state(state, "FINANCIAL_DATASETS_API_KEY")
     data = state["data"]
     end_date: str = data["end_date"]  # YYYY‑MM‑DD
-    tickers: list[str] = data["tickers"]
+    tickers: List[str] = data["tickers"]
 
     # We look one year back for insider trades / news flow
     start_date = (datetime.fromisoformat(end_date) - timedelta(days=365)).date().isoformat()
 
-    analysis_data: dict[str, dict] = {}
-    burry_analysis: dict[str, dict] = {}
+    analysis_data: Dict[str, dict] = {}
+    burry_analysis: Dict[str, dict] = {}
 
     for ticker in tickers:
         # ------------------------------------------------------------------
@@ -175,7 +176,7 @@ def _analyze_value(metrics, line_items, market_cap):
 
     max_score = 6  # 4 pts for FCF‑yield, 2 pts for EV/EBIT
     score = 0
-    details: list[str] = []
+    details: List[str] = []
 
     # Free‑cash‑flow yield
     latest_item = _latest_line_item(line_items)
@@ -223,7 +224,7 @@ def _analyze_balance_sheet(metrics, line_items):
 
     max_score = 3
     score = 0
-    details: list[str] = []
+    details: List[str] = []
 
     latest_metrics = metrics[0] if metrics else None
     latest_item = _latest_line_item(line_items)
@@ -264,7 +265,7 @@ def _analyze_insider_activity(insider_trades):
 
     max_score = 2
     score = 0
-    details: list[str] = []
+    details: List[str] = []
 
     if not insider_trades:
         details.append("No insider trade data")
@@ -289,7 +290,7 @@ def _analyze_contrarian_sentiment(news):
 
     max_score = 1
     score = 0
-    details: list[str] = []
+    details: List[str] = []
 
     if not news:
         details.append("No recent news")

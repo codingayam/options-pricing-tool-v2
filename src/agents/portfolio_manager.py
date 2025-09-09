@@ -1,4 +1,5 @@
 import json
+from typing import Dict, List
 from langchain_core.messages import HumanMessage
 from langchain_core.prompts import ChatPromptTemplate
 
@@ -17,7 +18,7 @@ class PortfolioDecision(BaseModel):
 
 
 class PortfolioManagerOutput(BaseModel):
-    decisions: dict[str, PortfolioDecision] = Field(description="Dictionary of ticker to trading decisions")
+    decisions: Dict[str, PortfolioDecision] = Field(description="Dictionary of ticker to trading decisions")
 
 
 ##### Portfolio Management Agent #####
@@ -98,11 +99,11 @@ def portfolio_management_agent(state: AgentState, agent_id: str = "portfolio_man
 
 
 def generate_trading_decision(
-    tickers: list[str],
-    signals_by_ticker: dict[str, dict],
-    current_prices: dict[str, float],
-    max_shares: dict[str, int],
-    portfolio: dict[str, float],
+    tickers: List[str],
+    signals_by_ticker: Dict[str, dict],
+    current_prices: Dict[str, float],
+    max_shares: Dict[str, int],
+    portfolio: Dict[str, float],
     agent_id: str,
     state: AgentState,
 ) -> PortfolioManagerOutput:

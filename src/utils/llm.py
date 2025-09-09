@@ -1,6 +1,7 @@
 """Helper functions for LLM"""
 
 import json
+from typing import Optional, Type, Any, Union
 from pydantic import BaseModel
 from src.llm.models import get_model, get_model_info
 from src.utils.progress import progress
@@ -8,10 +9,10 @@ from src.graph.state import AgentState
 
 
 def call_llm(
-    prompt: any,
-    pydantic_model: type[BaseModel],
-    agent_name: str | None = None,
-    state: AgentState | None = None,
+    prompt: Any,
+    pydantic_model: Type[BaseModel],
+    agent_name: Optional[str] = None,
+    state: Optional[AgentState] = None,
     max_retries: int = 3,
     default_factory=None,
 ) -> BaseModel:
@@ -106,7 +107,7 @@ def create_default_response(model_class: type[BaseModel]) -> BaseModel:
     return model_class(**default_values)
 
 
-def extract_json_from_response(content: str) -> dict | None:
+def extract_json_from_response(content: str) -> Optional[dict]:
     """Extracts JSON from markdown-formatted response."""
     try:
         json_start = content.find("```json")

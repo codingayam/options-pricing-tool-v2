@@ -1,5 +1,6 @@
 from src.graph.state import AgentState, show_agent_reasoning
 from langchain_core.prompts import ChatPromptTemplate
+from typing import Dict, Any
 from langchain_core.messages import HumanMessage
 from pydantic import BaseModel
 import json
@@ -159,7 +160,7 @@ def rakesh_jhunjhunwala_agent(state: AgentState, agent_id: str = "rakesh_jhunjhu
     return {"messages": [message], "data": state["data"]}
 
 
-def analyze_profitability(financial_line_items: list) -> dict[str, any]:
+def analyze_profitability(financial_line_items: list) -> Dict[str, Any]:
     """
     Analyze profitability metrics like net income, EBIT, EPS, operating income.
     Focus on strong, consistent earnings growth and operating efficiency.
@@ -243,7 +244,7 @@ def analyze_profitability(financial_line_items: list) -> dict[str, any]:
     return {"score": score, "details": "; ".join(reasoning)}
 
 
-def analyze_growth(financial_line_items: list) -> dict[str, any]:
+def analyze_growth(financial_line_items: list) -> Dict[str, Any]:
     """
     Analyze revenue and net income growth trends using CAGR.
     Jhunjhunwala favored companies with strong, consistent compound growth.
@@ -324,7 +325,7 @@ def analyze_growth(financial_line_items: list) -> dict[str, any]:
     return {"score": score, "details": "; ".join(reasoning)}
 
 
-def analyze_balance_sheet(financial_line_items: list) -> dict[str, any]:
+def analyze_balance_sheet(financial_line_items: list) -> Dict[str, Any]:
     """
     Check financial strength - healthy asset/liability structure, liquidity.
     Jhunjhunwala favored companies with clean balance sheets and manageable debt.
@@ -371,7 +372,7 @@ def analyze_balance_sheet(financial_line_items: list) -> dict[str, any]:
     return {"score": score, "details": "; ".join(reasoning)}
 
 
-def analyze_cash_flow(financial_line_items: list) -> dict[str, any]:
+def analyze_cash_flow(financial_line_items: list) -> Dict[str, Any]:
     """
     Evaluate free cash flow and dividend behavior.
     Jhunjhunwala appreciated companies generating strong free cash flow and rewarding shareholders.
@@ -406,7 +407,7 @@ def analyze_cash_flow(financial_line_items: list) -> dict[str, any]:
     return {"score": score, "details": "; ".join(reasoning)}
 
 
-def analyze_management_actions(financial_line_items: list) -> dict[str, any]:
+def analyze_management_actions(financial_line_items: list) -> Dict[str, Any]:
     """
     Look at share issuance or buybacks to assess shareholder friendliness.
     Jhunjhunwala liked managements who buy back shares or avoid dilution.
@@ -586,7 +587,7 @@ def analyze_rakesh_jhunjhunwala_style(
     owner_earnings: float = None,
     intrinsic_value: float = None,
     current_price: float = None,
-) -> dict[str, any]:
+) -> Dict[str, Any]:
     """
     Comprehensive analysis in Rakesh Jhunjhunwala's investment style.
     """
@@ -643,7 +644,7 @@ def analyze_rakesh_jhunjhunwala_style(
 # ────────────────────────────────────────────────────────────────────────────────
 def generate_jhunjhunwala_output(
     ticker: str,
-    analysis_data: dict[str, any],
+    analysis_data: Dict[str, Any],
     state: AgentState,
     agent_id: str,
 ) -> RakeshJhunjhunwalaSignal:

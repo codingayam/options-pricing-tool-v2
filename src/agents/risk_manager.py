@@ -1,5 +1,6 @@
 from langchain_core.messages import HumanMessage
 from src.graph.state import AgentState, show_agent_reasoning
+from typing import Dict
 from src.utils.progress import progress
 from src.tools.api import get_prices, prices_to_df
 import json
@@ -19,7 +20,7 @@ def risk_management_agent(state: AgentState, agent_id: str = "risk_management_ag
     risk_analysis = {}
     current_prices = {}  # Store prices here to avoid redundant API calls
     volatility_data = {}  # Store volatility metrics
-    returns_by_ticker: dict[str, pd.Series] = {}  # For correlation analysis
+    returns_by_ticker: Dict[str, pd.Series] = {}  # For correlation analysis
 
     # First, fetch prices and calculate volatility for all relevant tickers
     all_tickers = set(tickers) | set(portfolio.get("positions", {}).keys())

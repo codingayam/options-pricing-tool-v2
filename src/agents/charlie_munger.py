@@ -1,4 +1,5 @@
 from src.graph.state import AgentState, show_agent_reasoning
+from typing import Dict, Any
 from src.tools.api import get_financial_metrics, get_market_cap, search_line_items, get_insider_trades, get_company_news
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.messages import HumanMessage
@@ -680,7 +681,7 @@ def analyze_news_sentiment(news_items: list) -> str:
 
 def generate_munger_output(
     ticker: str,
-    analysis_data: dict[str, any],
+    analysis_data: Dict[str, Any],
     state: AgentState,
     agent_id: str,
 ) -> CharlieMungerSignal:

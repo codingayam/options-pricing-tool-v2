@@ -1,4 +1,5 @@
 import sys
+from typing import Dict, List
 
 from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage
@@ -17,7 +18,7 @@ from src.utils.ollama import ensure_ollama_and_model
 import argparse
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
-from src.utils.visualize import save_graph_as_png
+# from src.utils.visualize import save_graph_as_png
 import json
 
 # Load environment variables from .env file
@@ -43,12 +44,12 @@ def parse_hedge_fund_response(response):
 
 ##### Run the Hedge Fund #####
 def run_hedge_fund(
-    tickers: list[str],
+    tickers: List[str],
     start_date: str,
     end_date: str,
     portfolio: dict,
     show_reasoning: bool = False,
-    selected_analysts: list[str] = [],
+    selected_analysts: List[str] = [],
     model_name: str = "gpt-4.1",
     model_provider: str = "OpenAI",
 ):
@@ -146,6 +147,7 @@ if __name__ == "__main__":
     parser.add_argument("--show-reasoning", action="store_true", help="Show reasoning from each agent")
     parser.add_argument("--show-agent-graph", action="store_true", help="Show the agent graph")
     parser.add_argument("--ollama", action="store_true", help="Use Ollama for local LLM inference")
+    parser.add_argument("--non-interactive", action="store_true", help="Run with default settings (no interactive prompts)")
 
     args = parser.parse_args()
 
@@ -154,27 +156,32 @@ if __name__ == "__main__":
 
     # Select analysts
     selected_analysts = None
-    choices = questionary.checkbox(
-        "Select your AI analysts.",
-        choices=[questionary.Choice(display, value=value) for display, value in ANALYST_ORDER],
-        instruction="\n\nInstructions: \n1. Press Space to select/unselect analysts.\n2. Press 'a' to select/unselect all.\n3. Press Enter when done to run the hedge fund.\n",
-        validate=lambda x: len(x) > 0 or "You must select at least one analyst.",
-        style=questionary.Style(
-            [
-                ("checkbox-selected", "fg:green"),
-                ("selected", "fg:green noinherit"),
-                ("highlighted", "noinherit"),
-                ("pointer", "noinherit"),
-            ]
-        ),
-    ).ask()
-
-    if not choices:
-        print("\n\nInterrupt received. Exiting...")
-        sys.exit(0)
+    if args.non_interactive:
+        # Use default analysts (first few from the list)
+        selected_analysts = ['fundamentals_analyst', 'technical_analyst', 'valuation_analyst']
+        print(f"\nUsing default analysts: {', '.join(Fore.GREEN + choice.title().replace('_', ' ') + Style.RESET_ALL for choice in selected_analysts)}\n")
     else:
-        selected_analysts = choices
-        print(f"\nSelected analysts: {', '.join(Fore.GREEN + choice.title().replace('_', ' ') + Style.RESET_ALL for choice in choices)}\n")
+        choices = questionary.checkbox(
+            "Select your AI analysts.",
+            choices=[questionary.Choice(display, value=value) for display, value in ANALYST_ORDER],
+            instruction="\n\nInstructions: \n1. Press Space to select/unselect analysts.\n2. Press 'a' to select/unselect all.\n3. Press Enter when done to run the hedge fund.\n",
+            validate=lambda x: len(x) > 0 or "You must select at least one analyst.",
+            style=questionary.Style(
+                [
+                    ("checkbox-selected", "fg:green"),
+                    ("selected", "fg:green noinherit"),
+                    ("highlighted", "noinherit"),
+                    ("pointer", "noinherit"),
+                ]
+            ),
+        ).ask()
+
+        if not choices:
+            print("\n\nInterrupt received. Exiting...")
+            sys.exit(0)
+        else:
+            selected_analysts = choices
+            print(f"\nSelected analysts: {', '.join(Fore.GREEN + choice.title().replace('_', ' ') + Style.RESET_ALL for choice in choices)}\n")
 
     # Select LLM model based on whether Ollama is being used
     model_name = ""
@@ -215,39 +222,46 @@ if __name__ == "__main__":
         model_provider = ModelProvider.OLLAMA.value
         print(f"\nSelected {Fore.CYAN}Ollama{Style.RESET_ALL} model: {Fore.GREEN + Style.BRIGHT}{model_name}{Style.RESET_ALL}\n")
     else:
-        # Use the standard cloud-based LLM selection
-        model_choice = questionary.select(
-            "Select your LLM model:",
-            choices=[questionary.Choice(display, value=(name, provider)) for display, name, provider in LLM_ORDER],
-            style=questionary.Style(
-                [
-                    ("selected", "fg:green bold"),
-                    ("pointer", "fg:green bold"),
-                    ("highlighted", "fg:green"),
-                    ("answer", "fg:green bold"),
-                ]
-            ),
-        ).ask()
-
-        if not model_choice:
-            print("\n\nInterrupt received. Exiting...")
-            sys.exit(0)
-
-        model_name, model_provider = model_choice
-
-        # Get model info using the helper function
-        model_info = get_model_info(model_name, model_provider)
-        if model_info:
-            if model_info.is_custom():
-                model_name = questionary.text("Enter the custom model name:").ask()
-                if not model_name:
-                    print("\n\nInterrupt received. Exiting...")
-                    sys.exit(0)
-
-            print(f"\nSelected {Fore.CYAN}{model_provider}{Style.RESET_ALL} model: {Fore.GREEN + Style.BRIGHT}{model_name}{Style.RESET_ALL}\n")
+        if args.non_interactive:
+            # Use OpenAI by default
+            model_name = "gpt-4o-mini"
+            model_provider = ModelProvider.OPENAI.value
+            print(f"\nUsing default OpenAI model: {Fore.GREEN + Style.BRIGHT}{model_name}{Style.RESET_ALL}\n")
         else:
-            model_provider = "Unknown"
-            print(f"\nSelected model: {Fore.GREEN + Style.BRIGHT}{model_name}{Style.RESET_ALL}\n")
+            # Use the standard cloud-based LLM selection
+            model_choice = questionary.select(
+                "Select your LLM model:",
+                choices=[questionary.Choice(display, value=(name, provider)) for display, name, provider in LLM_ORDER],
+                style=questionary.Style(
+                    [
+                        ("selected", "fg:green bold"),
+                        ("pointer", "fg:green bold"),
+                        ("highlighted", "fg:green"),
+                        ("answer", "fg:green bold"),
+                    ]
+                ),
+            ).ask()
+
+            if not model_choice:
+                print("\n\nInterrupt received. Exiting...")
+                sys.exit(0)
+
+            model_name, model_provider = model_choice
+
+        # Get model info using the helper function (skip for non-interactive mode)
+        if not args.non_interactive:
+            model_info = get_model_info(model_name, model_provider)
+            if model_info:
+                if model_info.is_custom():
+                    model_name = questionary.text("Enter the custom model name:").ask()
+                    if not model_name:
+                        print("\n\nInterrupt received. Exiting...")
+                        sys.exit(0)
+
+                print(f"\nSelected {Fore.CYAN}{model_provider}{Style.RESET_ALL} model: {Fore.GREEN + Style.BRIGHT}{model_name}{Style.RESET_ALL}\n")
+            else:
+                model_provider = "Unknown"
+                print(f"\nSelected model: {Fore.GREEN + Style.BRIGHT}{model_name}{Style.RESET_ALL}\n")
 
     # Create the workflow with selected analysts
     workflow = create_workflow(selected_analysts)

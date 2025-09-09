@@ -1,5 +1,6 @@
 from colorama import Fore, Style
 from tabulate import tabulate
+from typing import List, Any
 from .analysts import ANALYST_ORDER
 import os
 import json
@@ -323,7 +324,7 @@ def format_backtest_row(
     sharpe_ratio: float = None,
     sortino_ratio: float = None,
     max_drawdown: float = None,
-) -> list[any]:
+) -> List[Any]:
     """Format a row for the backtest results table"""
     # Color the action
     action_color = {

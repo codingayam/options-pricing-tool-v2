@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from typing_extensions import Literal
+from typing import Dict, Any, Optional, Union
 from pydantic import BaseModel
 
 from src.graph.state import AgentState, show_agent_reasoning
@@ -38,8 +39,8 @@ def aswath_damodaran_agent(state: AgentState, agent_id: str = "aswath_damodaran_
     tickers   = data["tickers"]
     api_key  = get_api_key_from_state(state, "FINANCIAL_DATASETS_API_KEY")
 
-    analysis_data: dict[str, dict] = {}
-    damodaran_signals: dict[str, dict] = {}
+    analysis_data: Dict[str, dict] = {}
+    damodaran_signals: Dict[str, dict] = {}
 
     for ticker in tickers:
         # ─── Fetch core data ────────────────────────────────────────────────────
@@ -140,7 +141,7 @@ def aswath_damodaran_agent(state: AgentState, agent_id: str = "aswath_damodaran_
 # ────────────────────────────────────────────────────────────────────────────────
 # Helper analyses
 # ────────────────────────────────────────────────────────────────────────────────
-def analyze_growth_and_reinvestment(metrics: list, line_items: list) -> dict[str, any]:
+def analyze_growth_and_reinvestment(metrics: list, line_items: list) -> Dict[str, Any]:
     """
     Growth score (0-4):
       +2  5-yr CAGR of revenue > 8 %
@@ -190,7 +191,7 @@ def analyze_growth_and_reinvestment(metrics: list, line_items: list) -> dict[str
     return {"score": score, "max_score": max_score, "details": "; ".join(details), "metrics": latest.model_dump()}
 
 
-def analyze_risk_profile(metrics: list, line_items: list) -> dict[str, any]:
+def analyze_risk_profile(metrics: list, line_items: list) -> Dict[str, Any]:
     """
     Risk score (0-3):
       +1  Beta < 1.3
@@ -251,7 +252,7 @@ def analyze_risk_profile(metrics: list, line_items: list) -> dict[str, any]:
     }
 
 
-def analyze_relative_valuation(metrics: list) -> dict[str, any]:
+def analyze_relative_valuation(metrics: list) -> Dict[str, Any]:
     """
     Simple PE check vs. historical median (proxy since sector comps unavailable):
       +1 if TTM P/E < 70 % of 5-yr median
@@ -282,7 +283,7 @@ def analyze_relative_valuation(metrics: list) -> dict[str, any]:
 # ────────────────────────────────────────────────────────────────────────────────
 # Intrinsic value via FCFF DCF (Damodaran style)
 # ────────────────────────────────────────────────────────────────────────────────
-def calculate_intrinsic_value_dcf(metrics: list, line_items: list, risk_analysis: dict) -> dict[str, any]:
+def calculate_intrinsic_value_dcf(metrics: list, line_items: list, risk_analysis: dict) -> Dict[str, Any]:
     """
     FCFF DCF with:
       • Base FCFF = latest free cash flow
@@ -347,7 +348,7 @@ def calculate_intrinsic_value_dcf(metrics: list, line_items: list, risk_analysis
     }
 
 
-def estimate_cost_of_equity(beta: float | None) -> float:
+def estimate_cost_of_equity(beta: Optional[float]) -> float:
     """CAPM: r_e = r_f + β × ERP (use Damodaran's long-term averages)."""
     risk_free = 0.04          # 10-yr US Treasury proxy
     erp = 0.05                # long-run US equity risk premium
@@ -360,7 +361,7 @@ def estimate_cost_of_equity(beta: float | None) -> float:
 # ────────────────────────────────────────────────────────────────────────────────
 def generate_damodaran_output(
     ticker: str,
-    analysis_data: dict[str, any],
+    analysis_data: Dict[str, Any],
     state: AgentState,
     agent_id: str,
 ) -> AswathDamodaranSignal:

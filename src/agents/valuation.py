@@ -8,6 +8,7 @@ configurable weights.
 
 from statistics import median
 import json
+from typing import Dict, Optional
 from langchain_core.messages import HumanMessage
 from src.graph.state import AgentState, show_agent_reasoning
 from src.utils.progress import progress
@@ -25,7 +26,7 @@ def valuation_analyst_agent(state: AgentState, agent_id: str = "valuation_analys
     end_date = data["end_date"]
     tickers = data["tickers"]
     api_key = get_api_key_from_state(state, "FINANCIAL_DATASETS_API_KEY")
-    valuation_analysis: dict[str, dict] = {}
+    valuation_analysis: Dict[str, dict] = {}
 
     for ticker in tickers:
         progress.update_status(agent_id, ticker, "Fetching financial data")
@@ -67,7 +68,7 @@ def valuation_analyst_agent(state: AgentState, agent_id: str = "valuation_analys
         # ------------------------------------------------------------------
         # Valuation models
         # ------------------------------------------------------------------
-        wc_change = li_curr.working_capital - li_prev.working_capital
+        wc_change = (li_curr.working_capital or 0) - (li_prev.working_capital or 0)
 
         # Owner Earnings
         owner_val = calculate_owner_earnings_value(
@@ -166,10 +167,10 @@ def valuation_analyst_agent(state: AgentState, agent_id: str = "valuation_analys
 #############################
 
 def calculate_owner_earnings_value(
-    net_income: float | None,
-    depreciation: float | None,
-    capex: float | None,
-    working_capital_change: float | None,
+    net_income: Optional[float],
+    depreciation: Optional[float],
+    capex: Optional[float],
+    working_capital_change: Optional[float],
     growth_rate: float = 0.05,
     required_return: float = 0.15,
     margin_of_safety: float = 0.25,
@@ -199,7 +200,7 @@ def calculate_owner_earnings_value(
 
 
 def calculate_intrinsic_value(
-    free_cash_flow: float | None,
+    free_cash_flow: Optional[float],
     growth_rate: float = 0.05,
     discount_rate: float = 0.10,
     terminal_growth_rate: float = 0.02,
@@ -242,9 +243,9 @@ def calculate_ev_ebitda_value(financial_metrics: list):
 
 
 def calculate_residual_income_value(
-    market_cap: float | None,
-    net_income: float | None,
-    price_to_book_ratio: float | None,
+    market_cap: Optional[float],
+    net_income: Optional[float],
+    price_to_book_ratio: Optional[float],
     book_value_growth: float = 0.03,
     cost_of_equity: float = 0.10,
     terminal_growth_rate: float = 0.03,

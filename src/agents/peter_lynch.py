@@ -1,4 +1,5 @@
 from src.graph.state import AgentState, show_agent_reasoning
+from typing import Optional, Dict, Any
 from src.tools.api import (
     get_market_cap,
     search_line_items,
@@ -286,7 +287,7 @@ def analyze_lynch_fundamentals(financial_line_items: list) -> dict:
     return {"score": final_score, "details": "; ".join(details)}
 
 
-def analyze_lynch_valuation(financial_line_items: list, market_cap: float | None) -> dict:
+def analyze_lynch_valuation(financial_line_items: list, market_cap: Optional[float]) -> dict:
     """
     Peter Lynch's approach to 'Growth at a Reasonable Price' (GARP):
       - Emphasize the PEG ratio: (P/E) / Growth Rate
@@ -433,7 +434,7 @@ def analyze_insider_activity(insider_trades: list) -> dict:
 
 def generate_lynch_output(
     ticker: str,
-    analysis_data: dict[str, any],
+    analysis_data: Dict[str, Any],
     state: AgentState,
     agent_id: str,
 ) -> PeterLynchSignal:

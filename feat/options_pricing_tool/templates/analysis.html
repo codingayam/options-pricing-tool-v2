@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Options Pricing Comparison Tool</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .form-section {
+            padding: 30px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group label {
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: #333;
+        }
+
+        .form-group input,
+        .form-group select {
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .radio-group {
+            display: flex;
+            gap: 20px;
+            margin-top: 5px;
+        }
+
+        .radio-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .analyze-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 18px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        .analyze-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .analyze-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .results-section {
+            display: none;
+            padding: 30px;
+        }
+
+        .results-header {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-card h3 {
+            color: #667eea;
+            font-size: 0.9em;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+        }
+
+        .stat-card p {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .charts-container {
+            margin-top: 30px;
+        }
+
+        .chart-section {
+            margin-bottom: 40px;
+        }
+
+        .chart-title {
+            font-size: 1.4em;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #333;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 5px;
+        }
+
+        .error-message {
+            background: #ffe6e6;
+            color: #d63031;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            border-left: 4px solid #d63031;
+        }
+
+        .success-message {
+            background: #e6f7e6;
+            color: #00b894;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            border-left: 4px solid #00b894;
+        }
+
+        @media (max-width: 768px) {
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .results-header {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .header h1 {
+                font-size: 2em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Options Pricing Comparison Tool</h1>
+            <p>Compare Market, Black-Scholes, and Power Law pricing models</p>
+        </div>
+
+        <div class="form-section">
+            <form id="analysisForm">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="ticker">Ticker Symbol *</label>
+                        <input type="text" id="ticker" name="ticker" placeholder="e.g., AAPL" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Option Type *</label>
+                        <div class="radio-group">
+                            <div class="radio-item">
+                                <input type="radio" id="call" name="option_type" value="call" required>
+                                <label for="call">Call</label>
+                            </div>
+                            <div class="radio-item">
+                                <input type="radio" id="put" name="option_type" value="put" required>
+                                <label for="put">Put</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="start_date">Start Date (Optional)</label>
+                        <input type="date" id="start_date" name="start_date">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="end_date">End Date (Optional)</label>
+                        <input type="date" id="end_date" name="end_date">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="min_strike">Min Strike Price (Optional)</label>
+                        <input type="number" id="min_strike" name="min_strike" step="0.01" placeholder="e.g., 100">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="max_strike">Max Strike Price (Optional)</label>
+                        <input type="number" id="max_strike" name="max_strike" step="0.01" placeholder="e.g., 300">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="implied_volatility">Implied Volatility % (Optional)</label>
+                        <input type="number" id="implied_volatility" name="implied_volatility" step="0.1" min="0.1" max="200" placeholder="e.g., 25.0">
+                        <small style="color: #666; font-size: 0.9em; margin-top: 5px; display: block;">
+                            Custom IV to use instead of Yahoo Finance data. Leave blank to use market IV.
+                        </small>
+                    </div>
+                </div>
+
+                <button type="submit" class="analyze-btn" id="analyzeBtn">
+                    Analyze Options
+                </button>
+            </form>
+
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>Fetching market data and calculating prices...</p>
+            </div>
+        </div>
+
+        <div class="results-section" id="resultsSection">
+            <div class="results-header" id="resultsHeader">
+                <!-- Stats will be populated here -->
+            </div>
+
+            <div class="charts-container" id="chartsContainer">
+                <!-- Charts will be populated here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/options';
+        
+        // Set default dates (next 6 months)
+        document.addEventListener('DOMContentLoaded', function() {
+            const today = new Date();
+            const sixMonths = new Date();
+            sixMonths.setMonth(sixMonths.getMonth() + 6);
+            
+            document.getElementById('start_date').value = today.toISOString().split('T')[0];
+            document.getElementById('end_date').value = sixMonths.toISOString().split('T')[0];
+        });
+
+        document.getElementById('analysisForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData.entries());
+            
+            // Show loading
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('resultsSection').style.display = 'none';
+            document.getElementById('analyzeBtn').disabled = true;
+            
+            // Clear previous errors
+            const existingErrors = document.querySelectorAll('.error-message');
+            existingErrors.forEach(el => el.remove());
+            
+            // Validate strike price range
+            if (data.min_strike && data.max_strike) {
+                const minStrike = parseFloat(data.min_strike);
+                const maxStrike = parseFloat(data.max_strike);
+                if (minStrike >= maxStrike) {
+                    throw new Error('Minimum strike price must be less than maximum strike price');
+                }
+            }
+            
+            try {
+                // Validate ticker first
+                const ticker = data.ticker.trim().toUpperCase();
+                const validateResponse = await fetch(`${API_BASE}/validate/${ticker}`);
+                const validateData = await validateResponse.json();
+                
+                if (!validateData.valid) {
+                    throw new Error(validateData.message);
+                }
+                
+                // Prepare analysis request
+                const requestBody = {
+                    ticker: ticker,
+                    option_type: data.option_type
+                };
+                
+                if (data.start_date) requestBody.start_date = data.start_date;
+                if (data.end_date) requestBody.end_date = data.end_date;
+                if (data.min_strike) requestBody.min_strike = parseFloat(data.min_strike);
+                if (data.max_strike) requestBody.max_strike = parseFloat(data.max_strike);
+                if (data.implied_volatility) requestBody.implied_volatility = parseFloat(data.implied_volatility);
+                
+                // Run analysis
+                const response = await fetch(`${API_BASE}/analyze`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || 'Analysis failed');
+                }
+                
+                const results = await response.json();
+                displayResults(results);
+                
+            } catch (error) {
+                showError(error.message);
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('analyzeBtn').disabled = false;
+            }
+        });
+
+        function showError(message) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error-message';
+            errorDiv.textContent = message;
+            
+            const formSection = document.querySelector('.form-section');
+            formSection.appendChild(errorDiv);
+        }
+
+        function showSuccess(message) {
+            const successDiv = document.createElement('div');
+            successDiv.className = 'success-message';
+            successDiv.textContent = message;
+            
+            const formSection = document.querySelector('.form-section');
+            formSection.appendChild(successDiv);
+        }
+
+        function displayResults(results) {
+            // Store results globally for chart functions
+            window.currentAnalysisResults = results;
+            
+            // Show results section
+            document.getElementById('resultsSection').style.display = 'block';
+            
+            // Display summary stats
+            displayStats(results);
+            
+            // Display charts
+            displayCharts(results);
+            
+            // Check for widespread fallback usage
+            const totalContracts = results.pricing_results.length;
+            const fallbackContracts = results.pricing_results.filter(r => r.power_law_fallback_used).length;
+            const fallbackPercentage = (fallbackContracts / totalContracts) * 100;
+            
+            if (fallbackPercentage > 50) {
+                showError(`Warning: ${fallbackContracts}/${totalContracts} contracts (${fallbackPercentage.toFixed(0)}%) are using fallback reference strikes. Power Law model accuracy may be reduced when 95th percentile targets exceed available strikes.`);
+            } else if (fallbackContracts > 0) {
+                showSuccess(`Analysis completed for ${results.ticker} ${results.option_type} options (${fallbackContracts} contracts using fallback references)`);
+            } else {
+                showSuccess(`Analysis completed for ${results.ticker} ${results.option_type} options`);
+            }
+        }
+
+        function displayStats(results) {
+            const statsHTML = `
+                <div class="stat-card">
+                    <h3>Ticker</h3>
+                    <p>${results.ticker}</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Option Type</h3>
+                    <p>${results.option_type.toUpperCase()}</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Current Price</h3>
+                    <p>$${results.underlying_price.toFixed(2)}</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Risk-Free Rate</h3>
+                    <p>${(results.risk_free_rate * 100).toFixed(2)}%</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Contracts Analyzed</h3>
+                    <p>${results.pricing_results.length}</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Analysis Time</h3>
+                    <p>${new Date(results.analysis_timestamp).toLocaleTimeString()}</p>
+                </div>
+            `;
+            
+            document.getElementById('resultsHeader').innerHTML = statsHTML;
+        }
+
+        function displayCharts(results) {
+            const container = document.getElementById('chartsContainer');
+            container.innerHTML = '';
+            
+            // Group results by expiry date
+            const groupedResults = {};
+            results.pricing_results.forEach(result => {
+                const expiry = result.expiry;
+                if (!groupedResults[expiry]) {
+                    groupedResults[expiry] = [];
+                }
+                groupedResults[expiry].push(result);
+            });
+            
+            // Create chart for each expiry date
+            Object.keys(groupedResults).sort().forEach((expiry, index) => {
+                const expiryResults = groupedResults[expiry];
+                createPricingChart(expiry, expiryResults, index);
+            });
+        }
+
+        function createPricingChart(expiry, results, index) {
+            const container = document.getElementById('chartsContainer');
+            
+            // Count fallback usage for this expiry
+            const fallbackCount = results.filter(r => r.power_law_fallback_used).length;
+            const fallbackWarning = fallbackCount > 0 
+                ? `<div style="color: #FF6B35; font-size: 0.9em; margin-top: 5px;">⚠️ ${fallbackCount} contract(s) using fallback reference strikes</div>`
+                : '';
+            
+            // Calculate 95th percentile information for this expiry
+            const expiryDate = new Date(expiry);
+            const today = new Date();
+            const daysToExpiry = Math.floor((expiryDate - today) / (1000 * 60 * 60 * 24));
+            const percentileReturn = window.currentAnalysisResults.percentile_95_returns[daysToExpiry] || 0;
+            const underlyingPrice = window.currentAnalysisResults.underlying_price;
+            const percentileTargetPrice = underlyingPrice * (1 + percentileReturn);
+            
+            // Format percentile return for display
+            const percentileReturnPercent = (percentileReturn * 100).toFixed(2);
+            const percentileInfo = percentileReturn !== 0 
+                ? `<div style="color: #666; font-size: 0.85em; margin-top: 3px;">📊 95th percentile: ${percentileReturnPercent}% return → $${percentileTargetPrice.toFixed(2)} target</div>`
+                : '';
+            
+            // Create section for this expiry
+            const section = document.createElement('div');
+            section.className = 'chart-section';
+            section.innerHTML = `
+                <div class="chart-title">
+                    Options expiring ${new Date(expiry).toLocaleDateString()} (${results.length} contracts)
+                    ${fallbackWarning}
+                    ${percentileInfo}
+                </div>
+                <div id="chart-${index}" style="height: 500px;"></div>
+            `;
+            container.appendChild(section);
+            
+            // Sort results by strike price
+            results.sort((a, b) => a.strike - b.strike);
+            
+            // Prepare data for plotting
+            const strikes = results.map(r => r.strike);
+            const marketPrices = results.map(r => r.market_price);
+            const blackScholesPrices = results.map(r => r.black_scholes_price);
+            
+            // Get power law prices (default to alpha = 3.0)
+            const powerLawPrices = results.map(r => r.power_law_prices['3.0'] || 0);
+            
+            // Create custom hover text for better precision with fallback indicators
+            const marketHover = strikes.map((strike, i) => 
+                `Strike: $${strike}<br>Market: $${marketPrices[i].toFixed(3)}<br>Contracts: ${results.length}`
+            );
+            const bsHover = strikes.map((strike, i) => 
+                `Strike: $${strike}<br>Black-Scholes: $${blackScholesPrices[i].toFixed(3)}`
+            );
+            const plHover = strikes.map((strike, i) => {
+                const result = results[i];
+                const fallbackWarning = result.power_law_fallback_used 
+                    ? '<br>⚠️ <span style="color: orange">Fallback reference used</span>' 
+                    : '';
+                return `Strike: $${strike}<br>Power Law: $${powerLawPrices[i].toFixed(3)}${fallbackWarning}`;
+            });
+            
+            const traces = [
+                {
+                    x: strikes,
+                    y: marketPrices,
+                    name: 'Market Price',
+                    type: 'scatter',
+                    mode: 'lines+markers',
+                    line: { color: '#2E86AB', width: 3 },
+                    marker: { size: 8 },
+                    hovertemplate: '%{text}<extra></extra>',
+                    text: marketHover,
+                    connectgaps: false
+                },
+                {
+                    x: strikes,
+                    y: blackScholesPrices,
+                    name: 'Black-Scholes',
+                    type: 'scatter',
+                    mode: 'lines+markers',
+                    line: { color: '#A23B72', width: 3 },
+                    marker: { size: 8 },
+                    hovertemplate: '%{text}<extra></extra>',
+                    text: bsHover,
+                    connectgaps: false
+                },
+                {
+                    x: strikes,
+                    y: powerLawPrices,
+                    name: 'Power Law (α=3.0)',
+                    type: 'scatter',
+                    mode: 'lines+markers',
+                    line: { color: '#F18F01', width: 3 },
+                    marker: { 
+                        size: strikes.map((_, i) => results[i].power_law_fallback_used ? 12 : 8),
+                        color: strikes.map((_, i) => results[i].power_law_fallback_used ? '#FF6B35' : '#F18F01'),
+                        symbol: strikes.map((_, i) => results[i].power_law_fallback_used ? 'triangle-up' : 'circle'),
+                        line: { 
+                            color: strikes.map((_, i) => results[i].power_law_fallback_used ? '#FF0000' : '#F18F01'),
+                            width: 2 
+                        }
+                    },
+                    hovertemplate: '%{text}<extra></extra>',
+                    text: plHover,
+                    connectgaps: false
+                }
+            ];
+            
+            // Add 95th percentile target price line if available
+            if (percentileReturn !== 0) {
+                const minStrike = Math.min(...strikes);
+                const maxStrike = Math.max(...strikes);
+                traces.push({
+                    x: [minStrike, maxStrike],
+                    y: [percentileTargetPrice, percentileTargetPrice],
+                    name: `95th %ile Target ($${percentileTargetPrice.toFixed(2)})`,
+                    type: 'scatter',
+                    mode: 'lines',
+                    line: { 
+                        color: '#666666', 
+                        width: 2, 
+                        dash: 'dot' 
+                    },
+                    hovertemplate: `95th Percentile Target: $${percentileTargetPrice.toFixed(2)}<br>Return: ${percentileReturnPercent}%<extra></extra>`,
+                    showlegend: true
+                });
+            }
+            
+            // Determine optimal Y-axis range for low-value options
+            const allPrices = [...marketPrices, ...blackScholesPrices, ...powerLawPrices];
+            const validPrices = allPrices.filter(p => p > 0);
+            const maxPrice = Math.max(...validPrices);
+            const minPrice = Math.min(...validPrices);
+            
+            // Smart Y-axis scaling for low-value options
+            let yAxisConfig = {
+                title: 'Option Price ($)',
+                gridcolor: '#f0f0f0',
+                tickformat: '.2f'  // Default format
+            };
+            
+            // Dynamic scaling based on actual data range
+            if (maxPrice <= 0.01) {
+                // Ultra-low prices (under 1 cent) - tick every 0.001
+                yAxisConfig.dtick = 0.001;
+                yAxisConfig.range = [0, maxPrice * 1.2];
+                yAxisConfig.tickformat = '.4f';  // Show 4 decimal places
+            } else if (maxPrice <= 0.05) {
+                // Very low prices (under 5 cents) - tick every 0.005
+                yAxisConfig.dtick = 0.005;
+                yAxisConfig.range = [0, maxPrice * 1.2];
+                yAxisConfig.tickformat = '.3f';  // Show 3 decimal places
+            } else if (maxPrice <= 0.10) {
+                // Low prices (under 10 cents) - tick every 0.01
+                yAxisConfig.dtick = 0.01;
+                yAxisConfig.range = [0, maxPrice * 1.2];
+                yAxisConfig.tickformat = '.3f';
+            } else if (maxPrice <= 0.50) {
+                // Medium-low prices (under 50 cents) - tick every 0.05
+                yAxisConfig.dtick = 0.05;
+                yAxisConfig.range = [0, maxPrice * 1.2];
+                yAxisConfig.tickformat = '.3f';
+            } else if (maxPrice <= 1) {
+                // Under $1 - tick every 0.10
+                yAxisConfig.dtick = 0.1;
+                yAxisConfig.range = [0, maxPrice * 1.2];
+                yAxisConfig.tickformat = '.3f';
+            } else if (maxPrice <= 5) {
+                // Under $5 - tick every 0.25
+                yAxisConfig.dtick = 0.25;
+                yAxisConfig.range = [0, maxPrice * 1.1];
+                yAxisConfig.tickformat = '.2f';
+            } else if (maxPrice <= 20) {
+                // Under $20 - tick every $1
+                yAxisConfig.dtick = 1;
+                yAxisConfig.range = [0, maxPrice * 1.1];
+                yAxisConfig.tickformat = '.2f';
+            }
+            
+            const layout = {
+                title: {
+                    text: `Options Pricing Comparison - ${expiry}`,
+                    x: 0.5,
+                    font: { size: 16 }
+                },
+                xaxis: {
+                    title: 'Strike Price ($)',
+                    gridcolor: '#f0f0f0',
+                    tickformat: '.0f'
+                },
+                yaxis: yAxisConfig,
+                plot_bgcolor: 'white',
+                paper_bgcolor: 'white',
+                font: {
+                    family: 'Segoe UI, sans-serif'
+                },
+                legend: {
+                    orientation: 'h',
+                    x: 0.5,
+                    xanchor: 'center',
+                    y: -0.15,
+                    font: { size: 12 }
+                },
+                hovermode: 'x unified',
+                hoverformat: '.3f',  // Show 3 decimal places in hover
+                margin: { t: 60, b: 100, l: 80, r: 40 },
+                annotations: fallbackCount > 0 ? [{
+                    text: '🔸 Orange triangles = Power Law using fallback reference strikes',
+                    showarrow: false,
+                    x: 0.5,
+                    y: -0.25,
+                    xref: 'paper',
+                    yref: 'paper',
+                    xanchor: 'center',
+                    yanchor: 'top',
+                    font: { size: 10, color: '#666' }
+                }] : []
+            };
+            
+            const config = {
+                responsive: true,
+                displayModeBar: true,
+                modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'select2d'],
+                displaylogo: false,
+                toImageButtonOptions: {
+                    format: 'png',
+                    filename: `options_${results[0].ticker}_${expiry}`,
+                    height: 500,
+                    width: 800,
+                    scale: 2
+                }
+            };
+            
+            Plotly.newPlot(`chart-${index}`, traces, layout, config);
+        }
+    </script>
+</body>
+</html>

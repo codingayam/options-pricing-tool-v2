@@ -9,7 +9,7 @@ from langchain_gigachat import GigaChat
 from langchain_ollama import ChatOllama
 from enum import Enum
 from pydantic import BaseModel
-from typing import Tuple, List
+from typing import Tuple, List, Optional, Union
 from pathlib import Path
 
 
@@ -107,7 +107,7 @@ LLM_ORDER = [model.to_choice_tuple() for model in AVAILABLE_MODELS]
 OLLAMA_LLM_ORDER = [model.to_choice_tuple() for model in OLLAMA_MODELS]
 
 
-def get_model_info(model_name: str, model_provider: str) -> LLMModel | None:
+def get_model_info(model_name: str, model_provider: str) -> Optional[LLMModel]:
     """Get model information by model_name"""
     all_models = AVAILABLE_MODELS + OLLAMA_MODELS
     return next((model for model in all_models if model.model_name == model_name and model.provider == model_provider), None)
@@ -125,7 +125,7 @@ def get_models_list():
     ]
 
 
-def get_model(model_name: str, model_provider: ModelProvider, api_keys: dict = None) -> ChatOpenAI | ChatGroq | ChatOllama | GigaChat | None:
+def get_model(model_name: str, model_provider: ModelProvider, api_keys: dict = None) -> Union[ChatOpenAI, ChatGroq, ChatOllama, GigaChat, None]:
     if model_provider == ModelProvider.GROQ:
         api_key = (api_keys or {}).get("GROQ_API_KEY") or os.getenv("GROQ_API_KEY")
         if not api_key:

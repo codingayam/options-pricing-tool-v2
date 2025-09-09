@@ -1,4 +1,5 @@
 from src.graph.state import AgentState, show_agent_reasoning
+from typing import Optional, Dict, Any
 from src.tools.api import (
     get_market_cap,
     search_line_items,
@@ -397,7 +398,7 @@ def analyze_management_efficiency_leverage(financial_line_items: list) -> dict:
     return {"score": final_score, "details": "; ".join(details)}
 
 
-def analyze_fisher_valuation(financial_line_items: list, market_cap: float | None) -> dict:
+def analyze_fisher_valuation(financial_line_items: list, market_cap: Optional[float]) -> dict:
     """
     Phil Fisher is willing to pay for quality and growth, but still checks:
       - P/E
@@ -526,7 +527,7 @@ def analyze_sentiment(news_items: list) -> dict:
 
 def generate_fisher_output(
     ticker: str,
-    analysis_data: dict[str, any],
+    analysis_data: Dict[str, Any],
     state: AgentState,
     agent_id: str,
 ) -> PhilFisherSignal:
