@@ -176,6 +176,7 @@
             margin-bottom: 40px;
         }
 
+
         .chart-title {
             font-size: 1.4em;
             font-weight: bold;
@@ -275,6 +276,14 @@
                             Custom IV to use instead of Yahoo Finance data. Leave blank to use market IV.
                         </small>
                     </div>
+
+                    <div class="form-group">
+                        <label for="alpha">Power Law Alpha (Optional)</label>
+                        <input type="number" id="alpha" name="alpha" step="0.1" min="2.0" max="4.0" placeholder="3.0" value="3.0">
+                        <small style="color: #666; font-size: 0.9em; margin-top: 5px; display: block;">
+                            Alpha parameter for Power Law pricing model (2.0-4.0). Higher values = more conservative pricing.
+                        </small>
+                    </div>
                 </div>
 
                 <button type="submit" class="analyze-btn" id="analyzeBtn">
@@ -357,6 +366,7 @@
                 if (data.min_strike) requestBody.min_strike = parseFloat(data.min_strike);
                 if (data.max_strike) requestBody.max_strike = parseFloat(data.max_strike);
                 if (data.implied_volatility) requestBody.implied_volatility = parseFloat(data.implied_volatility);
+                if (data.alpha) requestBody.alpha = parseFloat(data.alpha);
                 
                 // Run analysis
                 const response = await fetch(`${API_BASE}/analyze`, {
@@ -463,6 +473,14 @@
             const container = document.getElementById('chartsContainer');
             container.innerHTML = '';
             
+            // Determine which alpha value was used (first available alpha from the first result)
+            const selectedAlpha = results.pricing_results.length > 0 && results.pricing_results[0].power_law_prices 
+                ? Object.keys(results.pricing_results[0].power_law_prices)[0] 
+                : '3.0';
+            
+            // Store selected alpha globally for use in charts
+            window.selectedAlpha = selectedAlpha;
+            
             // Group results by expiry date
             const groupedResults = {};
             results.pricing_results.forEach(result => {
@@ -489,30 +507,36 @@
                 ? `<div style="color: #FF6B35; font-size: 0.9em; margin-top: 5px;">⚠️ ${fallbackCount} contract(s) using fallback reference strikes</div>`
                 : '';
             
-            // Calculate 95th percentile information for this expiry
+            // Calculate volatility information for this expiry
             const expiryDate = new Date(expiry);
             const today = new Date();
             const daysToExpiry = Math.floor((expiryDate - today) / (1000 * 60 * 60 * 24));
             const percentileReturn = window.currentAnalysisResults.percentile_95_returns[daysToExpiry] || 0;
+            const historicalVol = window.currentAnalysisResults.historical_volatilities[daysToExpiry] || 0;
             const underlyingPrice = window.currentAnalysisResults.underlying_price;
             const percentileTargetPrice = underlyingPrice * (1 + percentileReturn);
             
-            // Format percentile return for display
+            // Format information for display
             const percentileReturnPercent = (percentileReturn * 100).toFixed(2);
-            const percentileInfo = percentileReturn !== 0 
-                ? `<div style="color: #666; font-size: 0.85em; margin-top: 3px;">📊 95th percentile: ${percentileReturnPercent}% return → $${percentileTargetPrice.toFixed(2)} target</div>`
-                : '';
+            const historicalVolPercent = (historicalVol * 100).toFixed(1);
+            const infoText = `
+                <div style="color: #666; font-size: 0.85em; margin-top: 3px;">
+                    📊 95th percentile: ${percentileReturnPercent}% return → $${percentileTargetPrice.toFixed(2)} target | 
+                    📈 Historical Vol: ${historicalVolPercent}%
+                </div>
+            `;
             
-            // Create section for this expiry
+            // Create section for this expiry with dual charts
             const section = document.createElement('div');
             section.className = 'chart-section';
             section.innerHTML = `
                 <div class="chart-title">
                     Options expiring ${new Date(expiry).toLocaleDateString()} (${results.length} contracts)
                     ${fallbackWarning}
-                    ${percentileInfo}
+                    ${infoText}
                 </div>
-                <div id="chart-${index}" style="height: 500px;"></div>
+                <div id="chart-${index}-prices" style="height: 400px; margin-bottom: 20px;"></div>
+                <div id="chart-${index}-metrics" style="height: 350px;"></div>
             `;
             container.appendChild(section);
             
@@ -523,25 +547,27 @@
             const strikes = results.map(r => r.strike);
             const marketPrices = results.map(r => r.market_price);
             const blackScholesPrices = results.map(r => r.black_scholes_price);
+            const selectedAlpha = window.selectedAlpha || '3.0';
+            const powerLawPrices = results.map(r => r.power_law_prices[selectedAlpha] || 0);
             
-            // Get power law prices (default to alpha = 3.0)
-            const powerLawPrices = results.map(r => r.power_law_prices['3.0'] || 0);
-            
-            // Create custom hover text for better precision with fallback indicators
-            const marketHover = strikes.map((strike, i) => 
-                `Strike: $${strike}<br>Market: $${marketPrices[i].toFixed(3)}<br>Contracts: ${results.length}`
-            );
-            const bsHover = strikes.map((strike, i) => 
-                `Strike: $${strike}<br>Black-Scholes: $${blackScholesPrices[i].toFixed(3)}`
-            );
-            const plHover = strikes.map((strike, i) => {
-                const result = results[i];
-                const fallbackWarning = result.power_law_fallback_used 
-                    ? '<br>⚠️ <span style="color: orange">Fallback reference used</span>' 
-                    : '';
-                return `Strike: $${strike}<br>Power Law: $${powerLawPrices[i].toFixed(3)}${fallbackWarning}`;
+            // Calculate percentage differences and IV data
+            const ivData = results.map(r => r.implied_volatility !== null ? r.implied_volatility * 100 : null);
+            const bsVsMarketPercent = results.map((r, i) => {
+                return r.market_price > 0 ? ((blackScholesPrices[i] - r.market_price) / r.market_price) * 100 : 0;
+            });
+            const plVsMarketPercent = results.map((r, i) => {
+                return r.market_price > 0 ? ((powerLawPrices[i] - r.market_price) / r.market_price) * 100 : 0;
             });
             
+            // Create PRICES chart
+            createPricesChart(index, strikes, marketPrices, blackScholesPrices, powerLawPrices, results, expiry, percentileTargetPrice, percentileReturnPercent, fallbackCount);
+            
+            // Create METRICS chart  
+            createMetricsChart(index, strikes, ivData, bsVsMarketPercent, plVsMarketPercent, results, expiry, historicalVolPercent);
+        }
+
+        function createPricesChart(index, strikes, marketPrices, blackScholesPrices, powerLawPrices, results, expiry, percentileTargetPrice, percentileReturnPercent, fallbackCount) {
+            const selectedAlpha = window.selectedAlpha || '3.0';
             const traces = [
                 {
                     x: strikes,
@@ -551,8 +577,7 @@
                     mode: 'lines+markers',
                     line: { color: '#2E86AB', width: 3 },
                     marker: { size: 8 },
-                    hovertemplate: '%{text}<extra></extra>',
-                    text: marketHover,
+                    hovertemplate: 'Strike: $%{x}<br>Market: $%{y:.3f}<extra></extra>',
                     connectgaps: false
                 },
                 {
@@ -563,34 +588,28 @@
                     mode: 'lines+markers',
                     line: { color: '#A23B72', width: 3 },
                     marker: { size: 8 },
-                    hovertemplate: '%{text}<extra></extra>',
-                    text: bsHover,
+                    hovertemplate: 'Strike: $%{x}<br>Black-Scholes: $%{y:.3f}<extra></extra>',
                     connectgaps: false
                 },
                 {
                     x: strikes,
                     y: powerLawPrices,
-                    name: 'Power Law (α=3.0)',
+                    name: `Power Law (α=${selectedAlpha})`,
                     type: 'scatter',
                     mode: 'lines+markers',
                     line: { color: '#F18F01', width: 3 },
                     marker: { 
                         size: strikes.map((_, i) => results[i].power_law_fallback_used ? 12 : 8),
                         color: strikes.map((_, i) => results[i].power_law_fallback_used ? '#FF6B35' : '#F18F01'),
-                        symbol: strikes.map((_, i) => results[i].power_law_fallback_used ? 'triangle-up' : 'circle'),
-                        line: { 
-                            color: strikes.map((_, i) => results[i].power_law_fallback_used ? '#FF0000' : '#F18F01'),
-                            width: 2 
-                        }
+                        symbol: strikes.map((_, i) => results[i].power_law_fallback_used ? 'triangle-up' : 'circle')
                     },
-                    hovertemplate: '%{text}<extra></extra>',
-                    text: plHover,
+                    hovertemplate: 'Strike: $%{x}<br>Power Law: $%{y:.3f}<extra></extra>',
                     connectgaps: false
                 }
             ];
             
             // Add 95th percentile target price line if available
-            if (percentileReturn !== 0) {
+            if (percentileTargetPrice > 0) {
                 const minStrike = Math.min(...strikes);
                 const maxStrike = Math.max(...strikes);
                 traces.push({
@@ -599,123 +618,129 @@
                     name: `95th %ile Target ($${percentileTargetPrice.toFixed(2)})`,
                     type: 'scatter',
                     mode: 'lines',
-                    line: { 
-                        color: '#666666', 
-                        width: 2, 
-                        dash: 'dot' 
-                    },
+                    line: { color: '#666666', width: 2, dash: 'dot' },
                     hovertemplate: `95th Percentile Target: $${percentileTargetPrice.toFixed(2)}<br>Return: ${percentileReturnPercent}%<extra></extra>`,
                     showlegend: true
                 });
             }
             
-            // Determine optimal Y-axis range for low-value options
+            // Smart Y-axis scaling
             const allPrices = [...marketPrices, ...blackScholesPrices, ...powerLawPrices];
             const validPrices = allPrices.filter(p => p > 0);
             const maxPrice = Math.max(...validPrices);
-            const minPrice = Math.min(...validPrices);
+            let yAxisConfig = { title: 'Option Price ($)', gridcolor: '#f0f0f0', tickformat: '.2f' };
             
-            // Smart Y-axis scaling for low-value options
-            let yAxisConfig = {
-                title: 'Option Price ($)',
-                gridcolor: '#f0f0f0',
-                tickformat: '.2f'  // Default format
-            };
-            
-            // Dynamic scaling based on actual data range
             if (maxPrice <= 0.01) {
-                // Ultra-low prices (under 1 cent) - tick every 0.001
-                yAxisConfig.dtick = 0.001;
-                yAxisConfig.range = [0, maxPrice * 1.2];
-                yAxisConfig.tickformat = '.4f';  // Show 4 decimal places
+                yAxisConfig.dtick = 0.001; yAxisConfig.range = [0, maxPrice * 1.2]; yAxisConfig.tickformat = '.4f';
             } else if (maxPrice <= 0.05) {
-                // Very low prices (under 5 cents) - tick every 0.005
-                yAxisConfig.dtick = 0.005;
-                yAxisConfig.range = [0, maxPrice * 1.2];
-                yAxisConfig.tickformat = '.3f';  // Show 3 decimal places
-            } else if (maxPrice <= 0.10) {
-                // Low prices (under 10 cents) - tick every 0.01
-                yAxisConfig.dtick = 0.01;
-                yAxisConfig.range = [0, maxPrice * 1.2];
-                yAxisConfig.tickformat = '.3f';
-            } else if (maxPrice <= 0.50) {
-                // Medium-low prices (under 50 cents) - tick every 0.05
-                yAxisConfig.dtick = 0.05;
-                yAxisConfig.range = [0, maxPrice * 1.2];
-                yAxisConfig.tickformat = '.3f';
+                yAxisConfig.dtick = 0.005; yAxisConfig.range = [0, maxPrice * 1.2]; yAxisConfig.tickformat = '.3f';
             } else if (maxPrice <= 1) {
-                // Under $1 - tick every 0.10
-                yAxisConfig.dtick = 0.1;
-                yAxisConfig.range = [0, maxPrice * 1.2];
-                yAxisConfig.tickformat = '.3f';
+                yAxisConfig.dtick = 0.1; yAxisConfig.range = [0, maxPrice * 1.2]; yAxisConfig.tickformat = '.3f';
             } else if (maxPrice <= 5) {
-                // Under $5 - tick every 0.25
-                yAxisConfig.dtick = 0.25;
-                yAxisConfig.range = [0, maxPrice * 1.1];
-                yAxisConfig.tickformat = '.2f';
-            } else if (maxPrice <= 20) {
-                // Under $20 - tick every $1
-                yAxisConfig.dtick = 1;
-                yAxisConfig.range = [0, maxPrice * 1.1];
-                yAxisConfig.tickformat = '.2f';
+                yAxisConfig.dtick = 0.25; yAxisConfig.range = [0, maxPrice * 1.1]; yAxisConfig.tickformat = '.2f';
             }
             
             const layout = {
-                title: {
-                    text: `Options Pricing Comparison - ${expiry}`,
-                    x: 0.5,
-                    font: { size: 16 }
-                },
-                xaxis: {
-                    title: 'Strike Price ($)',
-                    gridcolor: '#f0f0f0',
-                    tickformat: '.0f'
-                },
+                title: { text: `Option Prices - ${expiry}`, x: 0.5, font: { size: 16 } },
+                xaxis: { title: 'Strike Price ($)', gridcolor: '#f0f0f0', tickformat: '.0f' },
                 yaxis: yAxisConfig,
-                plot_bgcolor: 'white',
-                paper_bgcolor: 'white',
-                font: {
-                    family: 'Segoe UI, sans-serif'
-                },
-                legend: {
-                    orientation: 'h',
-                    x: 0.5,
-                    xanchor: 'center',
-                    y: -0.15,
-                    font: { size: 12 }
-                },
+                plot_bgcolor: 'white', paper_bgcolor: 'white',
+                font: { family: 'Segoe UI, sans-serif' },
+                legend: { orientation: 'h', x: 0.5, xanchor: 'center', y: -0.15, font: { size: 11 } },
                 hovermode: 'x unified',
-                hoverformat: '.3f',  // Show 3 decimal places in hover
-                margin: { t: 60, b: 100, l: 80, r: 40 },
+                margin: { t: 60, b: 80, l: 80, r: 40 },
                 annotations: fallbackCount > 0 ? [{
                     text: '🔸 Orange triangles = Power Law using fallback reference strikes',
-                    showarrow: false,
-                    x: 0.5,
-                    y: -0.25,
-                    xref: 'paper',
-                    yref: 'paper',
-                    xanchor: 'center',
-                    yanchor: 'top',
-                    font: { size: 10, color: '#666' }
+                    showarrow: false, x: 0.5, y: -0.22, xref: 'paper', yref: 'paper',
+                    xanchor: 'center', yanchor: 'top', font: { size: 9, color: '#666' }
                 }] : []
             };
             
-            const config = {
-                responsive: true,
-                displayModeBar: true,
-                modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'select2d'],
-                displaylogo: false,
-                toImageButtonOptions: {
-                    format: 'png',
-                    filename: `options_${results[0].ticker}_${expiry}`,
-                    height: 500,
-                    width: 800,
-                    scale: 2
+            Plotly.newPlot(`chart-${index}-prices`, traces, layout, {
+                responsive: true, displayModeBar: true,
+                modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'select2d'], displaylogo: false
+            });
+        }
+
+        function createMetricsChart(index, strikes, ivData, bsVsMarketPercent, plVsMarketPercent, results, expiry, historicalVolPercent) {
+            const traces = [
+                {
+                    x: strikes,
+                    y: ivData,
+                    name: 'Implied Volatility (%)',
+                    type: 'scatter',
+                    mode: 'lines+markers',
+                    line: { color: '#9B59B6', width: 3 },
+                    marker: { size: 8 },
+                    yaxis: 'y',
+                    hovertemplate: 'Strike: $%{x}<br>IV: %{y:.1f}%<extra></extra>',
+                    connectgaps: false
+                },
+                {
+                    x: strikes,
+                    y: bsVsMarketPercent,
+                    name: 'BS vs Market (%)',
+                    type: 'scatter',
+                    mode: 'lines+markers',
+                    line: { color: '#E74C3C', width: 3 },
+                    marker: { size: 8 },
+                    yaxis: 'y2',
+                    hovertemplate: 'Strike: $%{x}<br>BS vs Market: %{y:.1f}%<extra></extra>',
+                    connectgaps: false
+                },
+                {
+                    x: strikes,
+                    y: plVsMarketPercent,
+                    name: 'PL vs Market (%)',
+                    type: 'scatter',
+                    mode: 'lines+markers',
+                    line: { color: '#F39C12', width: 3 },
+                    marker: { 
+                        size: strikes.map((_, i) => results[i].power_law_fallback_used ? 12 : 8),
+                        color: strikes.map((_, i) => results[i].power_law_fallback_used ? '#FF6B35' : '#F39C12'),
+                        symbol: strikes.map((_, i) => results[i].power_law_fallback_used ? 'triangle-up' : 'circle')
+                    },
+                    yaxis: 'y2',
+                    hovertemplate: 'Strike: $%{x}<br>PL vs Market: %{y:.1f}%<extra></extra>',
+                    connectgaps: false
                 }
+            ];
+            
+            // Add historical volatility horizontal line
+            if (historicalVolPercent > 0) {
+                const minStrike = Math.min(...strikes);
+                const maxStrike = Math.max(...strikes);
+                traces.push({
+                    x: [minStrike, maxStrike],
+                    y: [parseFloat(historicalVolPercent), parseFloat(historicalVolPercent)],
+                    name: `Historical Vol (${historicalVolPercent}%)`,
+                    type: 'scatter',
+                    mode: 'lines',
+                    line: { color: '#27AE60', width: 2, dash: 'dot' },
+                    yaxis: 'y',
+                    hovertemplate: `Historical Volatility: ${historicalVolPercent}%<extra></extra>`,
+                    showlegend: true
+                });
+            }
+            
+            const layout = {
+                title: { text: `Option Metrics - ${expiry}`, x: 0.5, font: { size: 16 } },
+                xaxis: { title: 'Strike Price ($)', gridcolor: '#f0f0f0', tickformat: '.0f' },
+                yaxis: { title: 'Volatility (%)', side: 'left', gridcolor: '#f0f0f0', tickformat: '.1f' },
+                yaxis2: { title: 'Price Difference (%)', side: 'right', overlaying: 'y', tickformat: '.1f' },
+                plot_bgcolor: 'white', paper_bgcolor: 'white',
+                font: { family: 'Segoe UI, sans-serif' },
+                legend: { orientation: 'h', x: 0.5, xanchor: 'center', y: -0.15, font: { size: 11 } },
+                hovermode: 'x unified',
+                margin: { t: 60, b: 80, l: 80, r: 80 }
             };
             
-            Plotly.newPlot(`chart-${index}`, traces, layout, config);
+            Plotly.newPlot(`chart-${index}-metrics`, traces, layout, {
+                responsive: true, displayModeBar: true,
+                modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'select2d'], displaylogo: false
+            });
         }
+
     </script>
 </body>
 </html>

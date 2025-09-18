@@ -86,7 +86,7 @@ class AnalysisService:
             logger.info("="*80)
             
             # Fetch all required data
-            underlying, contracts, percentile_returns = self.data_service.fetch_complete_data(request)
+            underlying, contracts, percentile_returns, historical_volatilities = self.data_service.fetch_complete_data(request)
             
             if not contracts:
                 raise ValueError(f"No option contracts found for {ticker}")
@@ -100,6 +100,10 @@ class AnalysisService:
             logger.info(f"🎯 95TH PERCENTILE RETURNS by expiry days:")
             for days, return_pct in percentile_returns.items():
                 logger.info(f"   {days} days: {return_pct:.4f} ({return_pct*100:.2f}%)")
+            
+            logger.info(f"📊 HISTORICAL VOLATILITIES by expiry days:")
+            for days, vol in historical_volatilities.items():
+                logger.info(f"   {days} days: {vol:.4f} ({vol*100:.2f}%)")
             
             # Calculate Black-Scholes prices
             logger.info("\n" + "="*60)
@@ -130,6 +134,7 @@ class AnalysisService:
                     market_price=contract.market_price,
                     black_scholes_price=bs_price,
                     power_law_prices=pl_price_dict,
+                    implied_volatility=contract.implied_volatility,
                     power_law_fallback_used=pl_fallback_used
                 )
                 pricing_results.append(result)
@@ -143,6 +148,7 @@ class AnalysisService:
                 underlying_data=underlying,
                 pricing_results=pricing_results,
                 percentile_95_returns=percentile_returns,
+                historical_volatilities=historical_volatilities,
                 analysis_timestamp=datetime.now()
             )
             

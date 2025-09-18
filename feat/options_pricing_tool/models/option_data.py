@@ -34,6 +34,7 @@ class PricingResult:
     market_price: float
     black_scholes_price: float
     power_law_prices: Dict[float, float]  # alpha -> price mapping
+    implied_volatility: Optional[float] = None  # IV from Yahoo Finance
     power_law_fallback_used: bool = False  # True if reference strike fallback was used
     
 @dataclass
@@ -56,4 +57,5 @@ class AnalysisResult:
     underlying_data: UnderlyingData
     pricing_results: List[PricingResult]
     percentile_95_returns: Dict[int, float]  # expiry days -> return
+    historical_volatilities: Dict[int, float]  # expiry days -> volatility
     analysis_timestamp: datetime

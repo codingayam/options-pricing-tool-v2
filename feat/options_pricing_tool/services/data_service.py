@@ -205,7 +205,35 @@ class DataService:
             
         return float(np.percentile(returns, 95))
     
-    def fetch_complete_data(self, request: AnalysisRequest) -> Tuple[UnderlyingData, List[OptionContract], Dict[int, float]]:
+    def calculate_historical_volatility(self, historical_prices: List[float], 
+                                      expiry_days: int) -> float:
+        """Calculate annualized historical volatility for given duration"""
+        if len(historical_prices) < expiry_days + 1:
+            return 0.0
+            
+        prices = np.array(historical_prices)
+        
+        # Calculate daily returns for the lookback period
+        daily_returns = []
+        lookback_period = min(expiry_days * 4, len(prices) - 1)  # Use 4x the expiry period for volatility calc
+        
+        for i in range(len(prices) - lookback_period, len(prices) - 1):
+            if prices[i] > 0:
+                daily_return = np.log(prices[i + 1] / prices[i])
+                daily_returns.append(daily_return)
+        
+        if len(daily_returns) < 10:  # Need minimum data points
+            return 0.0
+        
+        # Calculate standard deviation of daily returns
+        daily_vol = np.std(daily_returns, ddof=1)
+        
+        # Annualize volatility (assuming 252 trading days per year)
+        annual_vol = daily_vol * np.sqrt(252)
+        
+        return float(annual_vol)
+    
+    def fetch_complete_data(self, request: AnalysisRequest) -> Tuple[UnderlyingData, List[OptionContract], Dict[int, float], Dict[int, float]]:
         """Fetch all required data for analysis"""
         # Get underlying data
         underlying = self.get_underlying_data(request.ticker)
@@ -213,8 +241,9 @@ class DataService:
         # Get options contracts
         contracts = self.get_options_chain(request.ticker, request.option_type, request.date_range, request.strike_range)
         
-        # Calculate 95th percentile returns for each expiry duration
+        # Calculate 95th percentile returns and historical volatilities for each expiry duration
         percentile_returns = {}
+        historical_volatilities = {}
         unique_expiry_days = set()
         
         for contract in contracts:
@@ -226,5 +255,8 @@ class DataService:
             percentile_returns[days] = self.calculate_percentile_returns(
                 underlying.historical_prices, days
             )
+            historical_volatilities[days] = self.calculate_historical_volatility(
+                underlying.historical_prices, days
+            )
         
-        return underlying, contracts, percentile_returns
+        return underlying, contracts, percentile_returns, historical_volatilities

@@ -203,22 +203,30 @@ def output_table(result):
         print(f"\n📅 Expiry: {expiry} ({len(contracts)} contracts)")
         print("-" * 80)
         
-        headers = ["Strike", "Market", "Black-Scholes", "Power Law (α=3.0)", "Difference (%)"]
+        # Get the first available alpha value from the results
+        first_result = contracts[0] if contracts else None
+        alpha_key = list(first_result.power_law_prices.keys())[0] if first_result and first_result.power_law_prices else "3.0"
+        
+        headers = ["Strike", "Market", "Black-Scholes", f"Power Law (α={alpha_key})", "IV (%)", "Difference (%)"]
         rows = []
         
         for contract in sorted(contracts, key=lambda x: x.strike):
-            pl_price = contract.power_law_prices.get(3.0, 0.0)
+            pl_price = contract.power_law_prices.get(float(alpha_key), 0.0)
             
             # Calculate percentage difference between market and Black-Scholes
             diff_pct = 0.0
             if contract.market_price > 0:
                 diff_pct = ((contract.black_scholes_price - contract.market_price) / contract.market_price) * 100
             
+            # Format IV as percentage
+            iv_str = f"{contract.implied_volatility*100:.1f}%" if contract.implied_volatility is not None else "N/A"
+            
             rows.append([
                 f"${contract.strike:.2f}",
                 f"${contract.market_price:.2f}",
                 f"${contract.black_scholes_price:.2f}",
                 f"${pl_price:.2f}",
+                iv_str,
                 f"{diff_pct:+.1f}%"
             ])
         
@@ -239,23 +247,30 @@ def output_json(result):
                 "expiry": p.expiry.isoformat(),
                 "market_price": p.market_price,
                 "black_scholes_price": p.black_scholes_price,
-                "power_law_prices": p.power_law_prices
+                "power_law_prices": p.power_law_prices,
+                "implied_volatility": p.implied_volatility
             }
             for p in result.pricing_results
         ],
-        "percentile_95_returns": result.percentile_95_returns
+        "percentile_95_returns": result.percentile_95_returns,
+        "historical_volatilities": result.historical_volatilities
     }
     
     print(json.dumps(data, indent=2))
 
 def output_csv(result):
     """Output results as CSV"""
-    print("ticker,option_type,expiry,strike,market_price,black_scholes_price,power_law_3_0,underlying_price,risk_free_rate")
+    # Get the first available alpha value from the results
+    first_result = result.pricing_results[0] if result.pricing_results else None
+    alpha_key = list(first_result.power_law_prices.keys())[0] if first_result and first_result.power_law_prices else "3.0"
+    
+    print(f"ticker,option_type,expiry,strike,market_price,black_scholes_price,power_law_{alpha_key},implied_volatility,underlying_price,risk_free_rate")
     
     for pricing in result.pricing_results:
-        pl_price = pricing.power_law_prices.get(3.0, 0.0)
+        pl_price = pricing.power_law_prices.get(float(alpha_key), 0.0)
+        iv_value = pricing.implied_volatility if pricing.implied_volatility is not None else ""
         print(f"{result.ticker},{result.option_type.value},{pricing.expiry},{pricing.strike},"
-              f"{pricing.market_price},{pricing.black_scholes_price},{pl_price},"
+              f"{pricing.market_price},{pricing.black_scholes_price},{pl_price},{iv_value},"
               f"{result.underlying_data.current_price},{result.underlying_data.risk_free_rate}")
 
 if __name__ == "__main__":

@@ -22,6 +22,7 @@ class AnalysisRequestModel(BaseModel):
     min_strike: Optional[float] = Field(None, description="Minimum strike price (optional)")
     max_strike: Optional[float] = Field(None, description="Maximum strike price (optional)")
     alpha_values: Optional[List[float]] = Field(None, description="Alpha values for power law (2.0-4.0)")
+    alpha: Optional[float] = Field(None, ge=2.0, le=4.0, description="Single alpha value for power law (2.0-4.0)")
     implied_volatility: Optional[float] = Field(None, ge=0.1, le=200.0, description="Custom implied volatility as percentage (0.1-200%)")
 
 class ValidationResponse(BaseModel):
@@ -34,6 +35,7 @@ class PricingResultResponse(BaseModel):
     market_price: float
     black_scholes_price: float
     power_law_prices: dict  # alpha -> price mapping
+    implied_volatility: Optional[float] = None  # IV from Yahoo Finance
     power_law_fallback_used: bool = False  # True if reference strike fallback was used
 
 class AnalysisResponse(BaseModel):
@@ -43,6 +45,7 @@ class AnalysisResponse(BaseModel):
     risk_free_rate: float
     pricing_results: List[PricingResultResponse]
     percentile_95_returns: dict
+    historical_volatilities: dict
     analysis_timestamp: str
 
 @router.get("/validate/{ticker}")
@@ -84,12 +87,17 @@ async def analyze_options(request: AnalysisRequestModel) -> AnalysisResponse:
         if request.implied_volatility is not None:
             custom_iv = request.implied_volatility / 100.0
         
+        # Handle alpha parameter
+        alpha_values = request.alpha_values
+        if request.alpha is not None:
+            alpha_values = [request.alpha]
+        
         analysis_request = AnalysisRequest(
             ticker=request.ticker,
             option_type=option_type,
             date_range=date_range,
             strike_range=strike_range,
-            alpha_values=request.alpha_values,
+            alpha_values=alpha_values,
             custom_iv=custom_iv
         )
         
@@ -104,6 +112,7 @@ async def analyze_options(request: AnalysisRequestModel) -> AnalysisResponse:
                 market_price=pr.market_price,
                 black_scholes_price=pr.black_scholes_price,
                 power_law_prices=pr.power_law_prices,
+                implied_volatility=pr.implied_volatility,
                 power_law_fallback_used=pr.power_law_fallback_used
             )
             for pr in result.pricing_results
@@ -116,6 +125,7 @@ async def analyze_options(request: AnalysisRequestModel) -> AnalysisResponse:
             risk_free_rate=result.underlying_data.risk_free_rate,
             pricing_results=pricing_results,
             percentile_95_returns=result.percentile_95_returns,
+            historical_volatilities=result.historical_volatilities,
             analysis_timestamp=result.analysis_timestamp.isoformat()
         )
         
