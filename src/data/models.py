@@ -1,4 +1,5 @@
-from pydantic import BaseModel
+from datetime import date
+from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any, Union
 
 
@@ -137,6 +138,54 @@ class CompanyFacts(BaseModel):
 
 class CompanyFactsResponse(BaseModel):
     company_facts: CompanyFacts
+
+
+class OptionContract(BaseModel):
+    ticker: str
+    conid: int
+    expiry: date
+    strike: float
+    right: str  # "C" for calls, "P" for puts
+    multiplier: Optional[int] = None
+    exchange: Optional[str] = None
+    market_price: Optional[float] = None
+    bid: Optional[float] = None
+    ask: Optional[float] = None
+    bid_size: Optional[int] = None
+    ask_size: Optional[int] = None
+    volume: Optional[int] = None
+    open_interest: Optional[int] = None
+    implied_volatility: Optional[float] = None
+    delta: Optional[float] = None
+    gamma: Optional[float] = None
+    theta: Optional[float] = None
+    vega: Optional[float] = None
+    underlying_price: Optional[float] = None
+    mark_price: Optional[float] = None
+    last_trade_price: Optional[float] = None
+    last_trade_size: Optional[int] = None
+    change: Optional[float] = None
+    additional_fields: Dict[str, Any] = Field(default_factory=dict)
+
+    @property
+    def option_type(self) -> str:
+        return "call" if self.right.upper() == "C" else "put"
+
+
+class OptionChain(BaseModel):
+    ticker: str
+    underlying_conid: int
+    options: List[OptionContract]
+    expirations: List[date]
+    multiplier: Optional[int] = None
+    trading_class: Optional[str] = None
+    exchanges: Optional[List[str]] = None
+    has_mini: Optional[bool] = None
+    additional_data: Dict[str, Any] = Field(default_factory=dict)
+
+
+class OptionChainResponse(BaseModel):
+    option_chain: OptionChain
 
 
 class Position(BaseModel):

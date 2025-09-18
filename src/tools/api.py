@@ -1,10 +1,22 @@
 import datetime
 import os
-import pandas as pd
+import importlib.util
+import os
 import requests
 import time
-import yfinance as yf
 from typing import Optional, List, Dict, Any, Union
+
+pd_spec = importlib.util.find_spec("pandas")
+if pd_spec is not None:
+    import pandas as pd  # type: ignore
+else:  # pragma: no cover - optional dependency
+    pd = None  # type: ignore
+
+yf_spec = importlib.util.find_spec("yfinance")
+if yf_spec is not None:
+    import yfinance as yf  # type: ignore
+else:  # pragma: no cover - optional dependency
+    yf = None  # type: ignore
 
 from src.data.cache import get_cache
 from src.data.models import (
@@ -60,22 +72,43 @@ def _make_api_request(url: str, headers: dict, method: str = "GET", json_data: d
 
 
 def get_prices(ticker: str, start_date: str, end_date: str, api_key: str = None) -> List[Price]:
-    """Fetch price data from cache or yfinance."""
+    """Fetch price data from cache, an external API, or yfinance."""
     # Create a cache key that includes all parameters to ensure exact matches
     cache_key = f"{ticker}_{start_date}_{end_date}"
-    
+
     # Check cache first - simple exact match
     if cached_data := _cache.get_prices(cache_key):
         return [Price(**price) for price in cached_data]
 
-    # Fetch from yfinance
+    # Prefer fetching from Financial Datasets API if an API key is provided.
+    api_key = api_key or os.getenv("FINANCIAL_DATASETS_API_KEY")
+    base_url = os.getenv("FINANCIAL_DATASETS_BASE_URL", "https://api.financialdatasets.ai")
+    if api_key:
+        headers = {"X-API-KEY": api_key}
+        url = (
+            f"{base_url.rstrip('/')}/v1/prices/{ticker}"
+            f"?start_date={start_date}&end_date={end_date}"
+        )
+
+        response = _make_api_request(url, headers)
+        if response.status_code == 200:
+            payload = response.json()
+            prices = [Price(**price) for price in payload.get("prices", [])]
+            if prices:
+                _cache.set_prices(cache_key, [p.model_dump() for p in prices])
+                return prices
+
+    # Fetch from yfinance as a fallback if available.
+    if yf is None:
+        raise Exception("yfinance is not installed. Install yfinance or provide an API key for Financial Datasets.")
+
     try:
         stock = yf.Ticker(ticker)
         hist = stock.history(start=start_date, end=end_date)
-        
+
         if hist.empty:
             return []
-        
+
         # Convert to Price objects
         prices = []
         for date, row in hist.iterrows():
